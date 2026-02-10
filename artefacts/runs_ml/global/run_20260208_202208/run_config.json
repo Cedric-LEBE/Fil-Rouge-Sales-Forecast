@@ -1,0 +1,12 @@
+{
+  "run_id": "20260208_202208",
+  "date_col": "Date",
+  "target_col": "daily_sales_global",
+  "test_size": 0.2,
+  "n_rows": 581,
+  "n_train": 464,
+  "n_test": 117,
+  "extra": {
+    "level": "global"
+  }
+}

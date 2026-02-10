@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fil-rouge-sales-forecast"
+version = "0.1.0"
+description = "Retail sales forecasting (ML + Time Series) with Streamlit dashboard."
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "pyarrow>=14.0",
+  "python-dotenv>=1.0",
+  "scikit-learn>=1.3",
+  "joblib>=1.3",
+  "xgboost>=1.7",
+  "matplotlib>=3.7",
+  "plotly>=5.18",
+  "streamlit>=1.30",
+  "statsmodels>=0.14",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "black>=23.9",
+  "isort>=5.12",
+  "flake8>=6.1",
+  "mypy>=1.7",
+]
+notebooks = [
+  "jupyter>=1.0",
+  "ipykernel>=6.25",
+]
+prophet = [
+  "prophet>=1.1",
+]
+all = [
+  "pytest>=7.4",
+  "black>=23.9",
+  "isort>=5.12",
+  "flake8>=6.1",
+  "mypy>=1.7",
+  "jupyter>=1.0",
+  "ipykernel>=6.25",
+  "prophet>=1.1",
+]
+
+[tool.setuptools]
+# Package à la racine (fil_rouge/)
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fil_rouge*"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
