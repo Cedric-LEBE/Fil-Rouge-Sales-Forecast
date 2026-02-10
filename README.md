@@ -157,6 +157,14 @@ Fil-Rouge-Sales-Forecast/
 ### En développement
 - 🚧 Developpement du backend du Chatbot (Chat with data)
 
+## 🌐 Déploiement
+
+L’application est actuellement déployée en version bêta et accessible en ligne.
+
+URL de l’application (beta) :
+
+🔗 https://sales-forecasts.streamlit.app/
+
 ## 📝 Contexte Métier
 
 Dans un contexte e-commerce, la capacité à anticiper les ventes futures est un levier stratégique majeur pour :
