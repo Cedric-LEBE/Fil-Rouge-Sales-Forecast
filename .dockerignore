@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+
+# Git
+.git/
+
+# Data / models (mounted as volumes)
+data/
+model_store/
+mlflow/
+
+# OS
+.DS_Store

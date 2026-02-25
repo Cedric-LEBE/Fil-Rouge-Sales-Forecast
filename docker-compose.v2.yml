@@ -1,0 +1,63 @@
+name: retail-forecast-v2
+
+services:
+  analytics-db:
+    image: pgvector/pgvector:pg15
+    container_name: retail-analytics-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: analytics
+      POSTGRES_USER: analytics
+      POSTGRES_PASSWORD: analytics
+    ports:
+      - "5433:5432"
+    volumes:
+      - analytics_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analytics -d analytics"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  analytics-load:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    image: retail-forecast-v2-loader:latest
+    container_name: retail-analytics-load
+    depends_on:
+      analytics-db:
+        condition: service_healthy
+    environment:
+      ANALYTICS_DATABASE_URL: postgresql+psycopg2://analytics:analytics@analytics-db:5432/analytics
+    volumes:
+      - ./data:/app/data
+      - ./model_store:/app/model_store
+      - ./:/app
+    command: python scripts/load_analytics_db.py
+    restart: "no"
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    image: retail-forecast-v2-streamlit:latest
+    container_name: retail-streamlit
+    restart: unless-stopped
+    depends_on:
+      analytics-db:
+        condition: service_healthy
+      analytics-load:
+        condition: service_completed_successfully
+    environment:
+      ANALYTICS_DATABASE_URL: ${ANALYTICS_DATABASE_URL:-postgresql+psycopg2://analytics:analytics@analytics-db:5432/analytics}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-70b-versatile}
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
+    volumes:
+      - ./data:/app/data
+      - ./model_store:/app/model_store
+
+volumes:
+  analytics_pg_data:
