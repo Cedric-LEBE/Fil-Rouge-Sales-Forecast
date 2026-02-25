@@ -9,9 +9,6 @@ __pycache__/
 
 # --- Virtualenvs ---
 .venv/
-env/
-.env.*
-*.env
 
 # --- Packaging / build ---
 build/
