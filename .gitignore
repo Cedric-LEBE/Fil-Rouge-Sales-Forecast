@@ -13,6 +13,7 @@ env/
 .env.*
 *.env
 .env
+.env.example
 
 # --- Packaging / build ---
 build/
