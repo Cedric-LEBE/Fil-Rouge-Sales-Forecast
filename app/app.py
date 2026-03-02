@@ -137,12 +137,17 @@ def iterative_forecast_ml(
 # =========================
 # Navigation in Sidebar
 # =========================
-if "page" not in st.session_state:
-    st.session_state["page"] = "📊 Dashboard"  # default landing page
+if "nav_page" not in st.session_state:
+    st.session_state["nav_page"] = "📊 Dashboard"
 
 with st.sidebar:
     st.header("Navigation")
-    page = st.radio("Aller vers", ["📊 Dashboard", "🔮 Prévision", "💬 Chatbot"], index=0, key="page")
+    page = st.radio(
+        "Aller vers",
+        ["📊 Dashboard", "🔮 Prévision", "💬 Chatbot"],
+        index=0,
+        key="nav_page",
+    )
 
 
 # =========================
@@ -215,8 +220,9 @@ if page == "📊 Dashboard":
         "💳 Paiements",
     ])
 
+
     # -------------------------------------------------
-    # 1) Vue d’ensemble 
+    # 1) Vue d’ensemble
     # -------------------------------------------------
     with tabs[0]:
         st.subheader("🌟 KPIs")
@@ -256,7 +262,7 @@ if page == "📊 Dashboard":
                 st.info("Pas de données pour cette période / filtres.")
 
         with colB:
-            st.subheader("Top régions")
+            st.subheader("Top regions")
             if "Region" in df_dash.columns and "Sales" in df_dash.columns and len(df_dash):
                 by_region = df_dash.groupby("Region")["Sales"].sum().sort_values(ascending=False).reset_index()
                 fig = px.bar(by_region.head(10), x="Sales", y="Region", orientation="h")
@@ -281,10 +287,37 @@ if page == "📊 Dashboard":
         with colD:
             st.subheader("Sales by Payment Type")
             if "payment_type" in df_dash.columns and "Sales" in df_dash.columns and len(df_dash):
-                by_pay = df_dash.groupby("payment_type")["Sales"].sum().sort_values(ascending=False).reset_index()
-                fig = px.pie(by_pay, names="payment_type", values="Sales", hole=0.45)
-                fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=360)
-                st.plotly_chart(fig, use_container_width=True, key="overview_pay")
+
+                by_pay = (
+                    df_dash.groupby("payment_type")["Sales"]
+                    .sum()
+                    .sort_values(ascending=False)
+                    .reset_index()
+                )
+
+                total = float(by_pay["Sales"].sum())
+                if total <= 0:
+                    st.info("Aucun montant de ventes exploitable pour afficher un donut.")
+                else:
+                    # % arrondi à 1 décimale + ajustement pour total=100.0
+                    by_pay["pct"] = (by_pay["Sales"] / total * 100).round(1)
+                    diff = round(100.0 - float(by_pay["pct"].sum()), 1)
+                    by_pay.loc[by_pay.index[-1], "pct"] = round(float(by_pay.loc[by_pay.index[-1], "pct"]) + diff, 1)
+
+                    fig = px.pie(
+                        by_pay,
+                        names="payment_type",
+                        values="pct",
+                        hole=0.45,
+                    )
+                    fig.update_traces(
+                        texttemplate="%{value:.1f}%",
+                        textposition="inside",
+                        hovertemplate="%{label}=%{value:.1f}%<br>Sales=%{customdata[0]:,.0f}<extra></extra>",
+                        customdata=by_pay[["Sales"]].to_numpy(),
+                    )
+                    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=360)
+                    st.plotly_chart(fig, use_container_width=True, key="overview_pay")
             else:
                 st.info("Aucun type de paiement disponible.")
 
@@ -300,18 +333,32 @@ if page == "📊 Dashboard":
         if "Sales" not in df_dash.columns or "Date" not in df_dash.columns or df_dash.empty:
             st.info("Pas de données disponibles.")
         else:
+            # ---------------- Daily ----------------
             daily = df_dash.groupby("Date")["Sales"].sum().reset_index()
 
+            # ---------------- Weekly (ISO YYYY-WW) ----------------
             weekly = (
-                df_dash.assign(Week=df_dash["Date"].dt.to_period("W").astype(str))
-                .groupby("Week")["Sales"].sum().reset_index()
+                df_dash.set_index("Date")["Sales"]
+                .resample("W-MON")  # semaine ISO (lundi)
+                .sum()
+                .reset_index()
+                .rename(columns={"Date": "WeekDay"})
             )
 
+            iso = weekly["WeekDay"].dt.isocalendar()
+            weekly["YearWeek"] = (
+                iso.year.astype(str)
+                + "-"
+                + iso.week.astype(str).str.zfill(2)
+            )
+
+            # ---------------- Monthly ----------------
             monthly = (
                 df_dash.assign(Month=df_dash["Date"].dt.to_period("M").astype(str))
                 .groupby("Month")["Sales"].sum().reset_index()
             )
 
+            # ---------------- Quarterly ----------------
             quarterly = (
                 df_dash.assign(Quarter=df_dash["Date"].dt.to_period("Q").astype(str))
                 .groupby("Quarter")["Sales"].sum().reset_index()
@@ -319,23 +366,44 @@ if page == "📊 Dashboard":
 
             c1, c2 = st.columns(2)
 
+            # ===== DAILY =====
             with c1:
                 fig = px.line(daily, x="Date", y="Sales", title="Ventes quotidiennes")
                 fig.update_layout(height=360)
                 st.plotly_chart(fig, use_container_width=True, key="ts_daily")
 
+            # ===== WEEKLY (AXE + YYYY-WW) =====
             with c2:
-                fig = px.line(weekly, x="Week", y="Sales", title="Ventes hebdomadaires")
+                fig = px.line(
+                    weekly,
+                    x="WeekDay",
+                    y="Sales",
+                    title="Ventes hebdomadaires"
+                )
+
+                # Limiter le nombre de labels affichés
+                step = max(len(weekly) // 15, 1)
+                tick_idx = list(range(0, len(weekly), step))
+
+                fig.update_xaxes(
+                    tickmode="array",
+                    tickvals=weekly.loc[tick_idx, "WeekDay"],
+                    ticktext=weekly.loc[tick_idx, "YearWeek"],
+                    tickangle=45,
+                )
+
                 fig.update_layout(height=360)
                 st.plotly_chart(fig, use_container_width=True, key="ts_weekly")
 
             c3, c4 = st.columns(2)
 
+            # ===== MONTHLY =====
             with c3:
                 fig = px.line(monthly, x="Month", y="Sales", title="Ventes mensuelles")
                 fig.update_layout(height=360)
                 st.plotly_chart(fig, use_container_width=True, key="ts_monthly")
 
+            # ===== QUARTERLY =====
             with c4:
                 fig = px.line(quarterly, x="Quarter", y="Sales", title="Ventes trimestrielles")
                 fig.update_layout(height=360)
@@ -358,20 +426,50 @@ if page == "📊 Dashboard":
             st.divider()
             region_choice = st.selectbox("Choisir une région", ["Toutes"] + by_region["Region"].tolist(), key="reg_choice")
 
-            dft = df_dash.copy()
-            if region_choice != "Toutes":
-                dft = dft[dft["Region"] == region_choice]
+        dft = df_dash.copy()
 
-            ts = dft.groupby("Date")["Sales"].sum().reset_index()
-            fig = px.line(ts, x="Date", y="Sales", title=f"Ventes au fil du temps — {region_choice}")
-            fig.update_layout(height=360)
-            st.plotly_chart(fig, use_container_width=True, key="reg_time")
+        if region_choice == "Toutes":
+            # 1 courbe par région
+            ts = (
+                dft.groupby(["Date", "Region"])["Sales"]
+                .sum()
+                .reset_index()
+                .sort_values(["Date", "Region"])
+            )
+
+            fig = px.line(
+                ts,
+                x="Date",
+                y="Sales",
+                color="Region",
+                title="Ventes au fil du temps — Toutes les régions",
+            )
+
+        else:
+            # 1 seule courbe (région sélectionnée)
+            dft = dft[dft["Region"] == region_choice]
+            ts = (
+                dft.groupby("Date")["Sales"]
+                .sum()
+                .reset_index()
+                .sort_values("Date")
+            )
+
+            fig = px.line(
+                ts,
+                x="Date",
+                y="Sales",
+                title=f"Ventes au fil du temps — {region_choice}",
+            )
+
+        fig.update_layout(height=360)
+        st.plotly_chart(fig, use_container_width=True, key="reg_time")
 
     # -------------------------------------------------
     # 4) Ventes par produit (Macro_Category)
     # -------------------------------------------------
     with tabs[3]:
-        st.subheader("🧺 Ventes par produit")
+        st.subheader("🧺 Ventes par catégorie de produits")
 
         if "Sales" not in df_dash.columns or df_dash.empty:
             st.info("Pas de données disponibles.")
@@ -380,16 +478,14 @@ if page == "📊 Dashboard":
             if prod_col is None:
                 st.info("Aucune colonne produit trouvée (Macro_Category).")
             else:
-                top_n = st.slider("Top N catégories", 5, 50, 10, key="topn_prod")
 
                 by_prod = (
                     df_dash.groupby(prod_col)["Sales"].sum()
                     .sort_values(ascending=False)
-                    .head(top_n)
                     .reset_index()
                 )
 
-                fig = px.bar(by_prod, x="Sales", y=prod_col, orientation="h", title=f"Top {top_n} — Ventes globales par catégorie")
+                fig = px.bar(by_prod, x="Sales", y=prod_col, orientation="h", title=f"Ventes globales par catégorie")
                 fig.update_layout(height=420)
                 st.plotly_chart(fig, use_container_width=True, key="prod_global")
 
@@ -404,11 +500,43 @@ if page == "📊 Dashboard":
                     reg_choice = "Toutes"
 
                 dft = df_dash[df_dash[prod_col] == prod_choice].copy()
-                if reg_choice != "Toutes" and "Region" in dft.columns:
-                    dft = dft[dft["Region"] == reg_choice]
 
-                ts = dft.groupby("Date")["Sales"].sum().reset_index()
-                fig = px.line(ts, x="Date", y="Sales", title=f"Ventes au fil du temps — {prod_choice} — {reg_choice}")
+                if "Region" in dft.columns and reg_choice == "Toutes":
+                    # 1 courbe par région (pour la catégorie sélectionnée)
+                    ts = (
+                        dft.groupby(["Date", "Region"])["Sales"]
+                        .sum()
+                        .reset_index()
+                        .sort_values(["Date", "Region"])
+                    )
+
+                    fig = px.line(
+                        ts,
+                        x="Date",
+                        y="Sales",
+                        color="Region",
+                        title=f"Ventes au fil du temps — {prod_choice} — Toutes les régions",
+                    )
+
+                else:
+                    # 1 seule courbe (région sélectionnée ou pas de colonne Region)
+                    if reg_choice != "Toutes" and "Region" in dft.columns:
+                        dft = dft[dft["Region"] == reg_choice]
+
+                    ts = (
+                        dft.groupby("Date")["Sales"]
+                        .sum()
+                        .reset_index()
+                        .sort_values("Date")
+                    )
+
+                    fig = px.line(
+                        ts,
+                        x="Date",
+                        y="Sales",
+                        title=f"Ventes au fil du temps — {prod_choice} — {reg_choice}",
+                    )
+
                 fig.update_layout(height=360)
                 st.plotly_chart(fig, use_container_width=True, key="prod_time")
 
@@ -446,7 +574,7 @@ if page == "📊 Dashboard":
                         .sort_values(ascending=False).head(15)
                         .reset_index(name="clients_uniques")
                     )
-                    fig = px.bar(by_prod, x="clients_uniques", y="Macro_Category", orientation="h", title="Clients uniques — Top catégories")
+                    fig = px.bar(by_prod, x="clients_uniques", y="Macro_Category", orientation="h", title="Clients uniques par catégories")
                     fig.update_layout(height=360)
                     st.plotly_chart(fig, use_container_width=True, key="clients_prod")
                 else:
@@ -461,10 +589,37 @@ if page == "📊 Dashboard":
         if "payment_type" not in df_dash.columns or "Sales" not in df_dash.columns or df_dash.empty:
             st.info("Aucune info paiement (payment_type) disponible.")
         else:
-            by_pay = df_dash.groupby("payment_type")["Sales"].sum().sort_values(ascending=False).reset_index()
-            fig = px.pie(by_pay, names="payment_type", values="Sales", hole=0.45, title="Ventes globales par type de paiement")
-            fig.update_layout(height=360)
-            st.plotly_chart(fig, use_container_width=True, key="pay_global")
+            by_pay = (
+                df_dash.groupby("payment_type")["Sales"]
+                .sum()
+                .sort_values(ascending=False)
+                .reset_index()
+            )
+
+            total = float(by_pay["Sales"].sum())
+            if total <= 0:
+                st.info("Aucun montant de ventes exploitable pour afficher un donut.")
+            else:
+                # % arrondi à 1 décimale + ajustement pour total=100.0
+                by_pay["pct"] = (by_pay["Sales"] / total * 100).round(1)
+                diff = round(100.0 - float(by_pay["pct"].sum()), 1)
+                by_pay.loc[by_pay.index[-1], "pct"] = round(float(by_pay.loc[by_pay.index[-1], "pct"]) + diff, 1)
+
+                fig = px.pie(
+                    by_pay,
+                    names="payment_type",
+                    values="pct",
+                    hole=0.45,
+                    title="Ventes globales par type de paiement",
+                )
+                fig.update_traces(
+                    texttemplate="%{value:.1f}%",
+                    textposition="inside",
+                    hovertemplate="%{label}=%{value:.1f}%<br>Sales=%{customdata[0]:,.0f}<extra></extra>",
+                    customdata=by_pay[["Sales"]].to_numpy(),
+                )
+                fig.update_layout(margin=dict(l=5, r=5, t=40, b=5), height=300)
+                st.plotly_chart(fig, use_container_width=False, key="pay_global")
 
             st.divider()
 
@@ -494,14 +649,14 @@ elif page == "🔮 Prévision":
 
     # Onglets Prévision
     tabs_pred = st.tabs([
+        "🌍 Prévision globale — Vue exécutive",
         "📈 Prévision des ventes",
-        "🌍 Prévision globale",
     ])
 
     # =================================================
     # 1) Prévision des ventes 
     # =================================================
-    with tabs_pred[0]:
+    with tabs_pred[1]:
         level = st.selectbox("Niveau", ["Global", "Région"], key="pred_level")
         horizon = st.slider("Horizon (jours)", 7, 180, 30, 1, key="pred_horizon")
 
@@ -535,12 +690,20 @@ elif page == "🔮 Prévision":
 
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=out["Date"], y=out["y_true"], mode="lines", name="Historique"))
-                fig.add_trace(go.Scatter(x=out["Date"], y=out["y_pred"], mode="lines", name="Prévision"))
+                fig.add_trace(go.Scatter(x=out["Date"], y=out["y_pred"], mode="lines", name="Prévision", line=dict(color="red")))
                 fig.update_layout(height=420)
                 st.plotly_chart(fig, use_container_width=True, key="pred_global_chart")
 
                 st.subheader("Prévisions")
-                st.dataframe(out.tail(horizon + 30), use_container_width=True)
+
+                df_display = (
+                    out.tail(horizon)[["Date", "y_pred"]]
+                    .rename(columns={
+                        "y_pred": "Predicted_Sales"
+                    })
+                )
+                df_display["Date"] = pd.to_datetime(df_display["Date"]).dt.strftime("%Y-%m-%d")
+                st.dataframe(df_display, use_container_width=True)
 
         else:
             if not REGION_BASE_PATH.exists():
@@ -570,17 +733,25 @@ elif page == "🔮 Prévision":
 
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=out["Date"], y=out["y_true"], mode="lines", name="Historique"))
-                fig.add_trace(go.Scatter(x=out["Date"], y=out["y_pred"], mode="lines", name="Prévision"))
+                fig.add_trace(go.Scatter(x=out["Date"], y=out["y_pred"], mode="lines", name="Prévision", line=dict(color="red")))
                 fig.update_layout(height=420)
                 st.plotly_chart(fig, use_container_width=True, key="pred_region_chart")
 
                 st.subheader("Prévisions")
-                st.dataframe(out.tail(horizon + 30), use_container_width=True)
+
+                df_display = (
+                    out.tail(horizon)[["Date", "y_pred"]]
+                    .rename(columns={
+                        "y_pred": "Predicted_Sales"
+                    })
+                )
+                df_display["Date"] = pd.to_datetime(df_display["Date"]).dt.strftime("%Y-%m-%d")
+                st.dataframe(df_display, use_container_width=True)
 
     # =================================================
-    # 2) Prévision globale (KPIs + dashboard)
+    # 2) Prévision globale — Vue exécutive (KPIs + dashboard)
     # =================================================
-    with tabs_pred[1]:
+    with tabs_pred[0]:
         st.subheader("🌍 Prévision globale — Vue exécutive")
 
         if not GLOBAL_BASE_PATH.exists():
@@ -616,15 +787,15 @@ elif page == "🔮 Prévision":
         future = out.dropna(subset=["y_pred"]).copy()
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("📈 Ventes prévues (total)", f"{future['y_pred'].sum():,.0f}")
+        c1.metric("💰 Ventes prévues (total)", f"{future['y_pred'].sum():,.0f}")
         c2.metric("📆 Moyenne journalière prévue", f"{future['y_pred'].mean():,.0f}")
-        c3.metric("🧾 Dernière vente observée", f"{past['y_true'].iloc[-1]:,.0f}")
+        c3.metric("💵 Dernière vente observée", f"{past['y_true'].iloc[-1]:,.0f}")
 
         st.divider()
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=past["Date"], y=past["y_true"], mode="lines", name="Historique"))
-        fig.add_trace(go.Scatter(x=future["Date"], y=future["y_pred"], mode="lines", name="Prévision", line=dict(dash="dash")))
+        fig.add_trace(go.Scatter(x=future["Date"], y=future["y_pred"], mode="lines", name="Prévision", line=dict(color="red")))
         fig.update_layout(
             title=f"Prévision globale des ventes — {horizon_months} mois",
             height=480,
@@ -632,13 +803,53 @@ elif page == "🔮 Prévision":
         st.plotly_chart(fig, use_container_width=True, key="pred_exec_chart")
 
         st.subheader("Détail des prévisions (dernier 90 jours)")
-        st.dataframe(future.tail(90), use_container_width=True)
+
+        df_display = (
+            future.tail(90)[["Date", "y_pred"]]
+            .rename(columns={
+                "Date": "Date",
+                "y_pred": "Predicted_Sales"
+            })
+        )
+        df_display["Date"] = pd.to_datetime(df_display["Date"]).dt.strftime("%Y-%m-%d")
+        st.dataframe(df_display, use_container_width=True)
 
 # =========================
-# Page: Chatbot (Front-end)
+# Page: Chatbot — Analytics SQL + Forecast ML
 # =========================
 elif page == "💬 Chatbot":
-    st.subheader("💬 Chatbot — Chat with data")
+    st.subheader("💬 Chatbot — Analytics & Forecast")
+
+    import re
+    import plotly.express as px
+    import plotly.graph_objects as go
+
+    from analytics.query_executor import UnsafeSQLError, run_query
+    from llm.sql_generator import generate_sql
+    from llm.explanation import explain_result
+
+    # Forecast engine (joblib + parquet)
+    from forecast.ml_forecast import forecast_sales
+
+    SCHEMA_HINT = """
+Table: sales
+- date (date)
+- region (text)
+- macro_category (text)
+- sales (numeric)
+- payment_type (text, optional)
+- customer_id (text/int, optional)
+""".strip()
+
+    # -------------------------
+    # Sidebar settings
+    # -------------------------
+    with st.sidebar:
+        st.caption("⚙️ Chatbot settings")
+        show_sql = st.toggle("Afficher le SQL", value=False)
+        #max_rows = st.slider("Max lignes affichées", 50, 2000, 300, 50)
+        default_horizon = st.slider("Horizon forecast par défaut (jours)", 7, 365, 30, 1)
+
 
     # --- Aperçu rapide des données disponibles ---
     with st.expander("📦 Voir un aperçu du dataset", expanded=False):
@@ -647,33 +858,195 @@ elif page == "💬 Chatbot":
 
     st.divider()
 
-    # --- Historique de chat en session ---
+    # -------------------------
+    # Chat state
+    # -------------------------
     if "chat_messages" not in st.session_state:
         st.session_state["chat_messages"] = [
             {
                 "role": "assistant",
-                "content": "Salut 👋 Pose-moi une question sur les ventes, régions, catégories...",
+                "content": (
+                    "Salut 👋 Pose-moi une question sur les ventes, régions, catégories...\n\n"
+                ),
             }
         ]
 
-    # Affichage des messages
     for msg in st.session_state["chat_messages"]:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # Input utilisateur
-    user_q = st.chat_input("Ex: Quelles sont les 5 régions avec le plus de ventes ?")
+            # SQL (affiché seulement si toggle ON)
+            if show_sql and msg.get("sql"):
+                with st.expander("SQL généré", expanded=False):
+                    st.code(msg["sql"], language="sql")
 
+    user_q = st.chat_input(
+        "Ex: Top 5 régions par ventes, prévision des ventes dans 30 jours pour la région Southeast..."
+    )
+
+    # -------------------------
+    # Helpers
+    # -------------------------
+    def _is_forecast_question(q: str) -> bool:
+        ql = q.lower()
+        if any(k in ql for k in ["prévision", "prevision", "forecast", "prédire", "predire", "prediction"]):
+            return True
+        if re.search(r"\d+\s*(jour|jours|day|days)", ql) and any(k in ql for k in ["dans", "prochain", "next", "d'ici", "horizon"]):
+            return True
+        return False
+
+    def _extract_horizon(q: str) -> int:
+        m = re.search(r"(\d+)\s*(jour|jours|day|days)", q.lower())
+        if not m:
+            return int(default_horizon)
+        n = int(m.group(1))
+        return max(1, min(n, 365))
+
+    def _auto_chart_sql(df: pd.DataFrame):
+        if df is None or df.empty:
+            return None, None
+
+        cols = df.columns.tolist()
+        date_col = None
+        for c in cols:
+            if "date" in c.lower() or "day" in c.lower():
+                date_col = c
+                break
+
+        num_cols = [c for c in cols if pd.api.types.is_numeric_dtype(df[c])]
+        cat_cols = [c for c in cols if c not in num_cols]
+
+        # date + numeric -> line
+        if date_col and num_cols:
+            y = num_cols[0]
+            fig = px.line(df.sort_values(date_col), x=date_col, y=y)
+            return fig, f"line: x={date_col}, y={y}"
+
+        # category + numeric -> bar
+        if len(cat_cols) >= 1 and len(num_cols) >= 1:
+            x = num_cols[0]
+            y = cat_cols[0]
+            fig = px.bar(df, x=x, y=y, orientation="h")
+            return fig, f"bar: x={x}, y={y}"
+
+        return None, "table_only"
+
+    # -------------------------
+    # Main
+    # -------------------------
     if user_q:
         st.session_state["chat_messages"].append({"role": "user", "content": user_q})
 
-        # --- Réponse placeholder (backend à venir) ---
-        placeholder_answer = (
-            "Réponse\n\n"
-            "Backend en cours d'implémentation, réessayer plus tard...\n"
-        )
+        # ==========================================================
+        # PATH 1 — Forecast ML
+        # ==========================================================
+        if _is_forecast_question(user_q):
+            try:
+                with st.spinner("🔮 Calcul de la prévision (ML)..."):
+                    fr = forecast_sales(ROOT, user_q)  # horizon + region détectés dedans
 
-        st.session_state["chat_messages"].append({"role": "assistant", "content": placeholder_answer})
+                scope_label = "Global" if fr.scope == "global" else f"Région: {fr.region}"
+
+                header = (
+                    f"### Prévision ML — {scope_label}\n"
+                    f"- Horizon: **{fr.horizon_days} jours**\n"
+                    f"- Date cible: **{fr.forecast_date.date()}**\n"
+                    f"- Ventes prévues à J+{fr.horizon_days}: **{fr.y_at_horizon:,.0f}**\n"
+                    f"- Total prévu sur l’horizon: **{fr.future_sum:,.0f}**\n"
+                )
+
+                out = fr.df.copy()
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=out["Date"], y=out["y_true"], mode="lines", name="Historique"))
+                fig.add_trace(go.Scatter(x=out["Date"], y=out["y_pred"], mode="lines", name="Prévision"))
+                fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=420)
+
+                with st.spinner("📝 Explication (LLM)..."):
+                    df_exp = pd.DataFrame([{
+                        "scope": fr.scope,
+                        "region": fr.region or "GLOBAL",
+                        "horizon_days": fr.horizon_days,
+                        "forecast_date": str(fr.forecast_date.date()),
+                        "y_at_horizon": fr.y_at_horizon,
+                        "future_sum": fr.future_sum,
+                    }])
+
+                    explanation = explain_result(
+                        question=user_q,
+                        sql="FORECAST_ML",
+                        df=df_exp,
+                        chart_hint="forecast_line",
+                    )
+
+                with st.chat_message("assistant"):
+                    st.markdown(header)
+                    st.markdown(explanation)
+                    st.subheader("Graphique")
+                    st.plotly_chart(fig, use_container_width=True)
+                    st.subheader("Détail prévision")
+                    st.dataframe(out.tail(fr.horizon_days + 30), use_container_width=True)
+
+                st.session_state["chat_messages"].append(
+                    {"role": "assistant", "content": header + "\n\n" + explanation}
+                )
+                st.rerun()
+
+            except Exception as e:
+                st.session_state["chat_messages"].append(
+                    {"role": "assistant", "content": f"❌ Erreur Forecast ML: {e}"}
+                )
+                st.rerun()
+
+        # ==========================================================
+        # PATH 2 — Analytics SQL
+        # ==========================================================
+        try:
+            with st.spinner("🧠 Génération du SQL (Analytics)..."):
+                sql = generate_sql(user_q, schema_hint=SCHEMA_HINT)
+
+            if sql.strip().upper() == "UNSUPPORTED":
+                st.session_state["chat_messages"].append(
+                    {
+                        "role": "assistant",
+                        "content": (
+                            "Je ne peux pas répondre à cette question. \n\n"
+                            "Essaie une question sur: ventes, régions, catégories, dates."
+                        ),
+                    }
+                )
+                st.rerun()
+
+            with st.spinner("🧮 Exécution SQL..."):
+                qr = run_query(sql)
+                df = qr.df
+
+        except UnsafeSQLError as e:
+            st.session_state["chat_messages"].append({"role": "assistant", "content": f"SQL rejeté (sécurité): {e}"})
+            st.rerun()
+        except Exception as e:
+            st.session_state["chat_messages"].append({"role": "assistant", "content": f"Erreur d'exécution SQL: {e}"})
+            st.rerun()
+
+        fig, chart_hint = _auto_chart_sql(df)
+
+        with st.spinner("📝 Explication (LLM)..."):
+            explanation = explain_result(question=user_q, sql=sql, df=df, chart_hint=chart_hint)
+
+        with st.chat_message("assistant"):
+            if show_sql:
+                with st.expander("SQL généré", expanded=False):
+                    st.code(sql, language="sql")
+
+            st.markdown(explanation)
+
+            #st.subheader("Résultat")
+            #st.dataframe(df.head(max_rows), use_container_width=True)
+
+            if fig is not None:
+                st.subheader("Graphique")
+                fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=420)
+                st.plotly_chart(fig, use_container_width=True)
+
+        st.session_state["chat_messages"].append({"role": "assistant", "content": explanation, "sql": sql})
 
         st.rerun()
-
