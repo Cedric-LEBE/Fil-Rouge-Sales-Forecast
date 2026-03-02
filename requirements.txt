@@ -9,4 +9,6 @@ matplotlib>=3.7
 plotly>=5.18
 streamlit>=1.30
 statsmodels>=0.14
+SQLAlchemy==2.0.36
+psycopg2-binary==2.9.9
 sqlparse==0.5.0
