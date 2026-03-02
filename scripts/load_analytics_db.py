@@ -36,7 +36,7 @@ def main() -> None:
     engine = create_engine(DB_URL, pool_pre_ping=True)
 
     with engine.begin() as conn:
-        # pgvector extension is optional; doesn't hurt if missing
+
         try:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         except Exception:

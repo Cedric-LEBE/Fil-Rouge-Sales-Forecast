@@ -3,13 +3,12 @@ import pandas as pd
 
 def prophet_available() -> bool:
     try:
-        import prophet  # noqa
+        import prophet  
         return True
     except Exception:
         return False
 
 def fit_prophet(df: pd.DataFrame):
-    # df doit avoir ds, y
     from prophet import Prophet
     m = Prophet()
     m.fit(df)

@@ -128,7 +128,7 @@ def normalize_region_token(s: str) -> str:
     # common typos
     s = s.replace("southest", "southeast")
 
-    # FR → EN aliases (important: multi-words first)
+    # FR -> EN aliases (important: multi-words first)
     s = s.replace("sud est", "southeast").replace("sudest", "southeast").replace("sud-est", "southeast")
     s = s.replace("nord est", "northeast").replace("nord-est", "northeast").replace("nordest", "northeast")
     s = s.replace("centre ouest", "central west").replace("centre-ouest", "central west").replace("centreouest", "central west")

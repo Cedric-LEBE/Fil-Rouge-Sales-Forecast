@@ -21,7 +21,7 @@ def _infer_grain_from_sql(sql: str) -> Grain:
         return None
     g = m.group(1)
     if g in {"day", "week", "month", "quarter", "year"}:
-        return g  # type: ignore[return-value]
+        return g  
     return None
 
 
@@ -130,7 +130,6 @@ def explain_result(
     # Deterministic summary (always)
     # ----------------------------
     lines: list[str] = []
-    #lines.append("### ✅ Résumé")
 
     # Case A: AVG per period
     if _is_avg_per_period(df):
@@ -195,8 +194,6 @@ def explain_result(
         ctx.append(f"grain={grain}")
     if metric != "unknown":
         ctx.append(f"metric={metric}")
-    if ctx:
-        lines.append(f"\n<span class='small-note'>Contexte détecté: {', '.join(ctx)}</span>")
 
     deterministic = "\n".join(lines)
 
@@ -217,14 +214,18 @@ def explain_result(
 
     system = (
         "Tu es un analyste data senior. Réponds en français.\n"
+        "- Réponds en TEXTE BRUT uniquement (pas de Markdown, pas de HTML).\n"
         "Ta mission: expliquer les résultats de manière claire, concise et orientée business.\n"
         "RÈGLES IMPORTANTES:\n"
         "- Ne pas inventer des faits au-delà du résultat fourni.\n"
+        "- Ne répète pas la question.\n"
+        "- Ne montre jamais des champs techniques (n_rows, columns, total_rows, etc.).\n"
+        "- N'invente rien: base-toi uniquement sur result_preview + deterministic_summary.\n"
         "- Utilise le contexte détecté (metric/grain/unit) pour parler correctement:\n"
+        "- Si metric='sales', parle simplement de ventes.\n"
         "  * metric='sales' => monnaie en dollars ($)\n"
         "  * metric='clients' => parler en 'clients'\n"
-        "- Si le résultat est une moyenne par période, explique que c'est AVG des totaux par bucket (pas AVG des lignes).\n"
-        "- Si l'utilisateur demande 'pourquoi', propose des drivers plausibles (saisonnalité, mix régions, mix catégories) sans affirmer.\n"
+        "- Si l'utilisateur demande 'pourquoi', propose 2-3 hypothèses plausibles, formulées comme hypothèses.\n"
     )
 
     user_payload: dict[str, Any] = {
@@ -250,5 +251,7 @@ def explain_result(
 
     llm = (resp.choices[0].message.content or "").strip()
 
-    # Return combined: deterministic first (ground truth), then LLM interpretation
-    return deterministic + "\n\n---\n\n" + llm
+
+    if os.getenv("GROQ_API_KEY"):
+        return llm  
+    return deterministic

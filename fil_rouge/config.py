@@ -2,7 +2,6 @@ from __future__ import annotations
 from pathlib import Path
 import os
 
-# Project root = dossier qui contient pyproject.toml
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 DATA_DIR = PROJECT_ROOT / "data"
@@ -22,7 +21,6 @@ RAW_FILES = {
     "products": "df_Products.csv",
 }
 
-# Colonnes sources (adaptées à ton dataset)
 ORDER_ID_COL = "order_id"
 CUSTOMER_ID_COL = "customer_id"
 PRODUCT_ID_COL = "product_id"

@@ -134,8 +134,6 @@ def _group_dimension(q: str) -> Optional[Literal["region", "macro_category"]]:
 def _where_clause(region: Optional[str], d0: Optional[str], d1: Optional[str]) -> str:
     where = []
     if region:
-        # safe-ish because region comes from controlled detection OR user text
-        # We keep ILIKE but escape %/_ minimally
         r = region.replace("%", "").replace("_", "")
         where.append(f"region ILIKE '%{r}%'")
     if d0 and d1:
@@ -144,14 +142,13 @@ def _where_clause(region: Optional[str], d0: Optional[str], d1: Optional[str]) -
 
 
 def _bucket_expr(grain: TimeGrain) -> str:
-    # always return as date for nice charts
+
     return f"date_trunc('{grain}', date)::date"
 
 
 def _metric_expr(metric: Literal["sales", "clients"]) -> str:
     if metric == "sales":
         return "SUM(sales)"
-    # clients
     return "COUNT(DISTINCT customer_id)"
 
 
@@ -201,7 +198,7 @@ def _heuristic_sql(question: str, *, schema_hint: str) -> Optional[str]:
     where_sql = _where_clause(region, d0, d1)
     group_dim = _group_dimension(question)
 
-    # Moyenne des clients "par jour" = AVG des clients uniques/jour (pas AVG sur lignes)
+    # Moyenne des clients "par jour" 
     if "moyenne" in q and ("par jour" in q or "quotid" in q or "daily" in q) and ("client" in q or "customers" in q):
         return (
             "WITH daily AS (\n"
@@ -215,14 +212,13 @@ def _heuristic_sql(question: str, *, schema_hint: str) -> Optional[str]:
         )
 
     # -------------------------
-    # 1) AVERAGE per period (correct)
-    # e.g. "moyenne des ventes par jour/mois/année"
+    # 1) AVERAGE per period 
+    # EX. "moyenne des ventes par jour/mois/année"
     # -------------------------
     if _wants_average(question):
         bucket = _bucket_expr(grain)
         inner_metric = _metric_expr(metric)
 
-        # avg per period, optionally by region/category
         if group_dim in ("region", "macro_category"):
             dim = group_dim
             return (

@@ -16,7 +16,6 @@ from fil_rouge.pipelines.ts.models_sarimax import fit_sarimax, forecast_sarimax
 from fil_rouge.pipelines.ts.models_prophet import prophet_available, fit_prophet, forecast_prophet
 
 def _time_exog(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
-    # exog simples
     return pd.DataFrame({
         "dow": df[date_col].dt.dayofweek.astype(int),
         "is_weekend": df[date_col].dt.dayofweek.isin([5,6]).astype(int),
@@ -34,7 +33,6 @@ def run_train_ts_region() -> None:
     for region in regions:
         df_r = base[base[GROUP_COL] == region].sort_values(DATE_COL).reset_index(drop=True)
         if len(df_r) < 60:
-            # trop court pour TS sérieux
             continue
 
         train_df, test_df = time_split(df_r, DATE_COL, test_size=TEST_SIZE)
@@ -74,7 +72,6 @@ def run_train_ts_region() -> None:
         except Exception as e:
             results.append({"model": "SARIMAX", "error": str(e)})
 
-        # 3) Prophet (optionnel)
         if prophet_available():
             try:
                 p_train = train_df[[DATE_COL, TARGET_COL]].rename(columns={DATE_COL: "ds", TARGET_COL: "y"})
@@ -122,7 +119,6 @@ def run_train_ts_region() -> None:
 
         # sauvegarde robuste
         if best_name == "SARIMAX":
-            # statsmodels a sa méthode save
             model_obj.save(out_dir / "model.pkl")
         else:
             joblib.dump(model_obj, out_dir / "model.joblib")

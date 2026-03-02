@@ -5,7 +5,7 @@ import numpy as np
 def add_business_features(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
 
-    # Macro category (si la colonne existe)
+    # Macro category 
     if "product_category_name" in out.columns:
         TECH_ELECTRONICS = {
             "computers_accessories","electronics","audio","consoles_games",
@@ -42,7 +42,7 @@ def add_business_features(df: pd.DataFrame) -> pd.DataFrame:
 
         out["Macro_Category"] = out["product_category_name"].astype(str).apply(map_macro)
 
-    # Region mapping (si customer_state existe)
+    # Region mapping 
     if "customer_state" in out.columns:
         state_to_region = {
             "SP": "Southeast","RJ": "Southeast","MG": "Southeast","ES": "Southeast",

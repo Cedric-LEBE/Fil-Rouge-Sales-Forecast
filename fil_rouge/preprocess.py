@@ -29,7 +29,7 @@ def merge_and_clean_olist(
     if delivered_only and ORDER_STATUS_COL in df.columns:
         df = df[df[ORDER_STATUS_COL] == DELIVERED_VALUE].copy()
 
-    # fill NA raisonnables
+    # fill NA 
     if "product_category_name" in df.columns:
         df["product_category_name"] = df["product_category_name"].fillna("Unknown")
 

@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
   && rm -rf /var/lib/apt/lists/*
 
-# Install project (pyproject)
 COPY pyproject.toml /app/pyproject.toml
 COPY fil_rouge /app/fil_rouge
 COPY app /app/app
