@@ -21,6 +21,9 @@ dependencies = [
   "plotly>=5.18",
   "streamlit>=1.30",
   "statsmodels>=0.14",
+  "sqlalchemy>=2.0",
+  "psycopg2-binary>=2.9",
+  "sqlparse>=0.4",
 ]
 
 [project.optional-dependencies]
