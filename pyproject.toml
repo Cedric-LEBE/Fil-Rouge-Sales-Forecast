@@ -24,6 +24,7 @@ dependencies = [
   "sqlalchemy>=2.0",
   "psycopg2-binary>=2.9",
   "sqlparse>=0.4",
+  "groq"
 ]
 
 [project.optional-dependencies]
