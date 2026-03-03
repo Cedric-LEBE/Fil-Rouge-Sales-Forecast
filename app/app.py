@@ -929,7 +929,7 @@ Table: sales
             fig = px.bar(df, x=x, y=y, orientation="h")
             return fig, f"bar: x={x}, y={y}"
 
-        return None, "table_only"
+        return None, "text_only"
 
     # -------------------------
     # Main
@@ -981,10 +981,10 @@ Table: sales
                 with st.chat_message("assistant"):
                     st.markdown(header)
                     st.markdown(explanation)
-                    st.subheader("Graphique")
-                    st.plotly_chart(fig, use_container_width=True)
-                    st.subheader("Détail prévision")
-                    st.dataframe(out.tail(fr.horizon_days + 30), use_container_width=True)
+                    #st.subheader("Graphique")
+                    #st.plotly_chart(fig, use_container_width=True)
+                    #st.subheader("Détail prévision")
+                    #st.dataframe(out.tail(fr.horizon_days + 30), use_container_width=True)
 
                 st.session_state["chat_messages"].append(
                     {"role": "assistant", "content": header + "\n\n" + explanation}
@@ -1042,11 +1042,11 @@ Table: sales
             #st.subheader("Résultat")
             #st.dataframe(df.head(max_rows), use_container_width=True)
 
-            if fig is not None:
-                st.subheader("Graphique")
-                fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=420)
-                st.plotly_chart(fig, use_container_width=True)
+            #if fig is not None:
+                #st.subheader("Graphique")
+                #fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=420)
+                #st.plotly_chart(fig, use_container_width=True)
 
         st.session_state["chat_messages"].append({"role": "assistant", "content": explanation, "sql": sql})
 
-        st.rerun()
+        #st.rerun()
