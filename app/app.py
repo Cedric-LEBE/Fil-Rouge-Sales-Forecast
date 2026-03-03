@@ -929,7 +929,7 @@ Table: sales
             fig = px.bar(df, x=x, y=y, orientation="h")
             return fig, f"bar: x={x}, y={y}"
 
-        return None, "text_only"
+        return None, "table_only"
 
     # -------------------------
     # Main
@@ -1049,4 +1049,4 @@ Table: sales
 
         st.session_state["chat_messages"].append({"role": "assistant", "content": explanation, "sql": sql})
 
-        #st.rerun()
+        st.rerun()
