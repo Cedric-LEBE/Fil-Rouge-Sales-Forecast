@@ -929,7 +929,7 @@ Table: sales
             fig = px.bar(df, x=x, y=y, orientation="h")
             return fig, f"bar: x={x}, y={y}"
 
-        return None, "table_only"
+        return None, "text_only"
 
     # -------------------------
     # Main
